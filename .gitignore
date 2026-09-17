@@ -11,3 +11,8 @@ dist/
 
 uploads/
 logs/
+.runtime/ 
+.tools/ 
+.pnpm-store/ 
+.idea/ 
+dump.rdb 
