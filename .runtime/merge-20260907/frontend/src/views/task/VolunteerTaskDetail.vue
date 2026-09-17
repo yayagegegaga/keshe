@@ -1,0 +1,102 @@
+<script setup>
+import { onMounted, reactive, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
+import { cancelVolunteerTask, claimVolunteerTask, finishVolunteerTask, getVolunteerTaskDetail, reviewVolunteerTask } from '../../api/volunteerTask'
+
+const route = useRoute()
+const router = useRouter()
+const loading = ref(false)
+const task = ref(null)
+const finishForm = reactive({ content: '', imageUrl: '' })
+const reviewForm = reactive({ approved: true, reviewRemark: '' })
+
+const loadDetail = async () => {
+  loading.value = true
+  try {
+    const res = await getVolunteerTaskDetail(route.params.id)
+    task.value = res.data
+  } catch (e) {
+    ElMessage.error(e.message)
+  } finally {
+    loading.value = false
+  }
+}
+
+const run = async action => {
+  try {
+    await action()
+    ElMessage.success('操作成功')
+    await loadDetail()
+  } catch (e) {
+    ElMessage.error(e.message)
+  }
+}
+
+onMounted(loadDetail)
+</script>
+
+<template>
+  <main class="page">
+    <section class="shell">
+      <div class="header">
+        <h1>任务详情</h1>
+        <el-button @click="router.back()">返回</el-button>
+      </div>
+      <el-skeleton v-if="loading" :rows="6" animated />
+      <template v-else-if="task">
+        <el-card shadow="never">
+          <el-descriptions :column="2" border>
+            <el-descriptions-item label="标题">{{ task.title }}</el-descriptions-item>
+            <el-descriptions-item label="状态">{{ task.status }}</el-descriptions-item>
+            <el-descriptions-item label="类型">{{ task.taskType }}</el-descriptions-item>
+            <el-descriptions-item label="地点">{{ task.location }}</el-descriptions-item>
+            <el-descriptions-item label="发布人">{{ task.publisher?.nickname || task.publisherId }}</el-descriptions-item>
+            <el-descriptions-item label="志愿者">{{ task.volunteer?.nickname || task.volunteerId || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="描述" :span="2">{{ task.description || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="审核备注" :span="2">{{ task.reviewRemark || '-' }}</el-descriptions-item>
+          </el-descriptions>
+        </el-card>
+        <el-card class="block" shadow="never">
+          <template #header>操作</template>
+          <el-button type="primary" @click="run(() => claimVolunteerTask(task.id))">领取任务</el-button>
+          <el-button type="danger" @click="run(() => cancelVolunteerTask(task.id, { reason: '管理员取消' }))">取消任务</el-button>
+          <el-divider />
+          <el-form label-width="90px">
+            <el-form-item label="完成内容"><el-input v-model="finishForm.content" type="textarea" :rows="3" /></el-form-item>
+            <el-form-item label="图片URL"><el-input v-model="finishForm.imageUrl" /></el-form-item>
+            <el-form-item><el-button type="primary" @click="run(() => finishVolunteerTask(task.id, finishForm))">提交完成</el-button></el-form-item>
+          </el-form>
+          <el-divider />
+          <el-form :inline="true">
+            <el-form-item label="审核">
+              <el-radio-group v-model="reviewForm.approved">
+                <el-radio :label="true">通过</el-radio>
+                <el-radio :label="false">退回</el-radio>
+              </el-radio-group>
+            </el-form-item>
+            <el-form-item label="备注"><el-input v-model="reviewForm.reviewRemark" /></el-form-item>
+            <el-button type="success" @click="run(() => reviewVolunteerTask(task.id, reviewForm))">提交审核</el-button>
+          </el-form>
+        </el-card>
+        <el-card class="block" shadow="never">
+          <template #header>完成记录</template>
+          <el-table :data="task.records" border>
+            <el-table-column prop="createTime" label="时间" min-width="170" />
+            <el-table-column prop="volunteerId" label="志愿者ID" width="110" />
+            <el-table-column prop="content" label="内容" min-width="240" />
+            <el-table-column prop="imageUrl" label="图片" min-width="180" />
+          </el-table>
+        </el-card>
+      </template>
+    </section>
+  </main>
+</template>
+
+<style scoped>
+.page { min-height: 100vh; background: #f5f7fb; padding: 32px 0; }
+.shell { width: min(1120px, calc(100% - 32px)); margin: 0 auto; }
+.header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; }
+h1 { margin: 0; font-size: 26px; }
+.block { margin-top: 18px; }
+</style>
